@@ -19,6 +19,11 @@
         </activity>
         <activity android:name=".Card">
         </activity>
+
+        <service
+            android:name=".RetrieveDB"
+            android:exported="false">
+        </service>
     </application>
 
 </manifest>

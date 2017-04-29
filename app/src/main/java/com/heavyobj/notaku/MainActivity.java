@@ -3,8 +3,10 @@ package com.heavyobj.notaku;
 import android.app.Activity;
 import android.app.LauncherActivity;
 import android.app.ProgressDialog;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.ContextWrapper;
+import android.content.Intent;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.support.v7.widget.LinearLayoutManager;
@@ -41,27 +43,24 @@ public class MainActivity extends AppCompatActivity {
     private RecyclerView recyclerView;
     private RecyclerView.Adapter adapter;
     private static final String URL = "https://kuristina.herokuapp.com/anime/Kronosfear.json";
-    private static final String DB = "http://s3.ap-south-1.amazonaws.com/notakuserver/anime.json";
-    private JSONObject DBObject;
-    private ArrayList<String> today_name;
-    private ArrayList<String> today_ep;
-    private ArrayList<String> today_time;
+
+
     private String epiair;
 
     private List<Card> listItems;
+    private ArrayList<String> today_name;
+    private ArrayList<String> today_ep;
+    private ArrayList<String> today_time;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        Intent msgIntent = new Intent(this, RetrieveDB.class);
+        startService(msgIntent);
         recyclerView = (RecyclerView) findViewById(R.id.recyclerView);
         recyclerView.setHasFixedSize(true);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
-
-        listItems = new ArrayList<>();
-        today_name = new ArrayList<>();
-        today_ep = new ArrayList<>();
-        today_time = new ArrayList<>();
         loadRecyclerViewData();
     }
 
@@ -70,29 +69,11 @@ public class MainActivity extends AppCompatActivity {
         final ProgressDialog progressDialog = new ProgressDialog(this);
         progressDialog.setMessage("Loading list...");
         progressDialog.show();
-        StringRequest DBRequest = new StringRequest(Request.Method.GET, DB, new Response.Listener<String>()
-        {
-            @Override
-            public void onResponse(String response)
-            {
-                try
-                {
-                    DBObject = new JSONObject(response);
-                } catch (JSONException e)
-                {
-                    e.printStackTrace();
-                }
-            }
-        },
-                new Response.ErrorListener()
-                {
-                    @Override
-                    public void onErrorResponse(VolleyError error)
-                    {
-
-                    }
-                });
-
+        listItems = new ArrayList<>();
+        today_name = new ArrayList<>();
+        today_ep = new ArrayList<>();
+        today_time = new ArrayList<>();
+        final TinyDB tinydb = new TinyDB(this);
         StringRequest stringRequest = new StringRequest(Request.Method.GET, URL, new Response.Listener<String>()
         {
             @Override
@@ -119,24 +100,10 @@ public class MainActivity extends AppCompatActivity {
                     JSONObject jsonObject = new JSONObject(s);
                     JSONObject jsonArray = jsonObject.getJSONObject("myanimelist");
                     JSONArray anime = jsonArray.getJSONArray("anime");
-                    JSONArray today_list = DBObject.getJSONArray("anime");
-                    DateTimeFormatter formatter = DateTimeFormat.forPattern("HH:mm");
-                    DateTimeZone dz = DateTimeZone.forID("Asia/Tokyo");
-                    String tzid = dz.getShortName(DateTimeUtils.currentTimeMillis());
-                    Log.d("tag", tzid);
-                    for (int i = 0; i < today_list.length(); i++)
-                    {
-                        formatter = formatter.withZone(dz);
-                        JSONObject x = today_list.getJSONObject(i);
-                        today_name.add(x.getString("show_title"));
-                        today_ep.add(x.getString("ep_no"));
-                        DateTime jptime = new DateTime (formatter.parseDateTime(x.getString("show_time")));
-                        Log.d("tag", formatter.print(jptime));
-                        formatter = formatter.withZone(DateTimeZone.getDefault());
-                        Log.d("tag", formatter.getZone().toString());
-                        Log.d("tag", x.getString("show_title") + formatter.print(jptime));
+                    today_name = tinydb.getListString("ShowTitles");
+                    today_time = tinydb.getListString("ShowTimes");
+                    today_ep = tinydb.getListString("ShowEpisode");
 
-                    }
                     for (int i = 0; i < anime.length(); i++)
                     {
                         JSONObject o = anime.getJSONObject(i);
@@ -175,7 +142,9 @@ public class MainActivity extends AppCompatActivity {
                 });
 
         RequestQueue requestQueue = Volley.newRequestQueue(this);
-        requestQueue.add(DBRequest);
         requestQueue.add(stringRequest);
+
     }
 }
+
+
